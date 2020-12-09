@@ -928,6 +928,11 @@ static void cs_8409_play_data_ssm3(struct hda_codec *codec)
 // 14,2 0x106b3600
 // 14,3 0x106b3900
 
+// imac subsystem ids
+// 18,3 0x106b1000
+// 19,1 0x106b1000
+
+
 static int cs_8409_data_config(struct hda_codec *codec);
 static int cs_8409_real_config(struct hda_codec *codec);
 
@@ -940,7 +945,7 @@ static int cs_8409_boot_setup(struct hda_codec *codec)
         // so it appears we break up the subsystem_id into 2 parts
         // a codec vendor id (16 bits) and a subvendor id (8 bits) plus an assembly id
         // so here the codec vendor is 0x106b, the subvendor id is 0x39 and the assembly id is 0x00
-        if (codec->core.subsystem_id == 0x106b3900) {
+        if (codec->core.subsystem_id == 0x106b3900 || codec->core.subsystem_id == 0x106b1000) {
                 if (spec->use_data) {
                         myprintk("snd_hda_intel: cs_8409_boot_setup pre cs_8409_data_config\n");
 
@@ -975,7 +980,7 @@ static int cs_8409_boot_setup(struct hda_codec *codec)
 void cs_8409_play_setup(struct hda_codec *codec)
 {
         struct cs_spec *spec = codec->spec;
-        if (codec->core.subsystem_id == 0x106b3900) {
+        if (codec->core.subsystem_id == 0x106b3900 || codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
                         //cs_8409_unmute_data(codec);
                         //cs_8409_volup_data(codec);
@@ -1003,7 +1008,7 @@ void cs_8409_play_setup(struct hda_codec *codec)
 void cs_8409_play_cleanup(struct hda_codec *codec)
 {
         struct cs_spec *spec = codec->spec;
-        if (codec->core.subsystem_id == 0x106b3900) {
+        if (codec->core.subsystem_id == 0x106b3900 || codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
                        cs_8409_playstop_data(codec);
 		} else {
@@ -1031,7 +1036,8 @@ void cs_8409_play_cleanup(struct hda_codec *codec)
 void cs_8409_capture_setup(struct hda_codec *codec)
 {
         struct cs_spec *spec = codec->spec;
-        if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900) {
+        if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
+		|| codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
                         //cs_8409_capture_data(codec);
 		} else {
@@ -1048,7 +1054,8 @@ void cs_8409_capture_setup(struct hda_codec *codec)
 void cs_8409_capture_cleanup(struct hda_codec *codec)
 {
         struct cs_spec *spec = codec->spec;
-        if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900) {
+        if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
+		|| codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
                        //cs_8409_capturestop_data(codec);
 		} else {
@@ -1175,7 +1182,7 @@ static void cs_8409_headset_mike_setup_nouse(struct hda_codec *codec)
 void cs_8409_headplay_setup(struct hda_codec *codec)
 {
         struct cs_spec *spec = codec->spec;
-        if (codec->core.subsystem_id == 0x106b3900) {
+        if (codec->core.subsystem_id == 0x106b3900 || codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
                         cs_8409_headplay_data(codec);
 		} else {
@@ -1208,7 +1215,7 @@ void cs_8409_headplay_setup(struct hda_codec *codec)
 void cs_8409_headplay_cleanup(struct hda_codec *codec)
 {
         struct cs_spec *spec = codec->spec;
-        if (codec->core.subsystem_id == 0x106b3900) {
+        if (codec->core.subsystem_id == 0x106b3900 || codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
                         cs_8409_headplaystop_data(codec);
 		} else {
@@ -1245,7 +1252,8 @@ void cs_8409_headplay_cleanup(struct hda_codec *codec)
 void cs_8409_headcapture_setup(struct hda_codec *codec)
 {
         struct cs_spec *spec = codec->spec;
-        if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900) {
+        if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
+		|| codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
                         //cs_8409_headcapture_data(codec);
 		} else {
@@ -1270,7 +1278,8 @@ void cs_8409_headcapture_setup(struct hda_codec *codec)
 void cs_8409_headcapture_cleanup(struct hda_codec *codec)
 {
         struct cs_spec *spec = codec->spec;
-        if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900) {
+        if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
+		|| codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
                         //cs_8409_capturestop_data(codec);
 		} else {
