@@ -512,6 +512,8 @@ const struct snd_pci_quirk cs8409_fixup_tbl[] = {
 	SND_PCI_QUIRK(0x1028, 0x0AD2, "Dolphin", CS8409_DOLPHIN),
 	SND_PCI_QUIRK(0x1028, 0x0AD3, "Dolphin", CS8409_DOLPHIN),
 	SND_PCI_QUIRK(0x1028, 0x0ACF, "Dolphin", CS8409_DOLPHIN),
+	SND_PCI_QUIRK(0x106b, 0x3300, "MacBookPro 13,1", CS8409_MBP131),
+	SND_PCI_QUIRK(0x106b, 0x3900, "MacBookPro 14,3", CS8409_MBP143),
 	{} /* terminator */
 };
 
@@ -521,7 +523,17 @@ const struct hda_model_fixup cs8409_models[] = {
 	{ .id = CS8409_WARLOCK, .name = "warlock" },
 	{ .id = CS8409_CYBORG, .name = "cyborg" },
 	{ .id = CS8409_DOLPHIN, .name = "dolphin" },
+	{ .id = CS8409_MBP131, .name = "mbp131" },
+	{ .id = CS8409_MBP143, .name = "mbp143" },
 	{}
+};
+
+static const struct hda_pintbl mbp131_pincfgs[] = {
+       {} /* terminator */
+};
+
+static const struct hda_pintbl mbp143_pincfgs[] = {
+       {} /* terminator */
 };
 
 const struct hda_fixup cs8409_fixups[] = {
@@ -556,5 +568,25 @@ const struct hda_fixup cs8409_fixups[] = {
 	[CS8409_DOLPHIN_FIXUPS] = {
 		.type = HDA_FIXUP_FUNC,
 		.v.func = dolphin_fixups,
+	},
+	[CS8409_MBP131] = {
+		.type = HDA_FIXUP_PINS,
+		.v.pins = mbp131_pincfgs,
+		.chained = true,
+		.chain_id = CS8409_GPIO_0,
+	},
+	[CS8409_GPIO_0] = {
+		.type = HDA_FIXUP_FUNC,
+		.v.func = cs_8409_fixup_gpio,
+	},
+	[CS8409_MBP143] = {
+		.type = HDA_FIXUP_PINS,
+		.v.pins = mbp143_pincfgs,
+		.chained = true,
+		.chain_id = CS8409_GPIO,
+	},
+	[CS8409_GPIO] = {
+		.type = HDA_FIXUP_FUNC,
+		.v.func = cs_8409_fixup_gpio,
 	},
 };

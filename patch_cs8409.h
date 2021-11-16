@@ -13,10 +13,47 @@
 #include <sound/tlv.h>
 #include <linux/workqueue.h>
 #include <sound/hda_codec.h>
+#include <linux/ctype.h>
+#include <linux/timer.h>
 #include "hda_local.h"
 #include "hda_auto_parser.h"
 #include "hda_jack.h"
 #include "hda_generic.h"
+
+#include <linux/bitops.h>
+
+
+// define some explicit debugging print functions
+// under flag control so can be easily turned off
+
+
+#ifdef MYSOUNDDEBUGFULL
+#define mycodec_info(codec, fmt, args...) \
+        dev_info(hda_codec_dev(codec), fmt, ##args)
+#define mycodec_i2c_info(codec, fmt, args...) \
+        dev_info(hda_codec_dev(codec), fmt, ##args)
+#define mycodec_dbg(codec, fmt, args...) \
+        dev_info(hda_codec_dev(codec), fmt, ##args)
+#define myprintk_dbg(fmt, args...) \
+        printk(fmt, ##args)
+#define myprintk(fmt, args...) \
+        printk(fmt, ##args)
+#else
+#define mycodec_dbg(...)
+#define myprintk_dbg(...)
+#ifdef MYSOUNDDEBUG
+#define mycodec_info(codec, fmt, args...) \
+        dev_info(hda_codec_dev(codec), fmt, ##args)
+#define mycodec_i2c_info(codec, fmt, args...) \
+        dev_info(hda_codec_dev(codec), fmt, ##args)
+#define myprintk(fmt, args...) \
+        printk(fmt, ##args)
+#else
+#define mycodec_info(...)
+#define mycodec_i2c_info(...)
+#define myprintk(...)
+#endif
+#endif
 
 /* CS8409 Specific Definitions */
 
@@ -268,6 +305,10 @@ enum {
 	CS8409_FIXUPS,
 	CS8409_DOLPHIN,
 	CS8409_DOLPHIN_FIXUPS,
+	CS8409_MBP131,
+	CS8409_GPIO_0,
+	CS8409_MBP143,
+	CS8409_GPIO,
 };
 
 enum {
@@ -283,6 +324,10 @@ enum {
 #define CS42L42_ADC_VOL_OFFSET			(CS42L42_VOL_ADC)
 #define CS42L42_DAC_CH0_VOL_OFFSET		(CS42L42_VOL_DAC)
 #define CS42L42_DAC_CH1_VOL_OFFSET		(CS42L42_VOL_DAC + 1)
+
+#define CS8409_IDX_DEV_CFG     0x01
+#define CS8409_VENDOR_NID      0x47
+#define CS8409_BEEP_NID        0x46
 
 struct cs8409_i2c_param {
 	unsigned int addr;
@@ -315,6 +360,12 @@ struct sub_codec {
 	s8 vol[CS42L42_VOLUMES];
 };
 
+struct unsol_item {
+        struct list_head list;
+        unsigned int idx;
+        unsigned int res;
+};
+
 struct cs8409_spec {
 	struct hda_gen_spec gen;
 	struct hda_codec *codec;
@@ -339,6 +390,86 @@ struct cs8409_spec {
 	/* verb exec op override */
 	int (*exec_verb)(struct hdac_device *dev, unsigned int cmd, unsigned int flags,
 			 unsigned int *res);
+
+	hda_nid_t vendor_nid;
+	/* digital beep */
+        hda_nid_t beep_nid;
+
+	// so it appears we have "concurrency" in the linux HDA code
+	// in that if unsolicited responses occur which perform extensive verbs
+	// the hda verbs are intermixed with eg extensive start playback verbs
+	// on OSX we appear to have blocks of verbs during which unsolicited responses
+	// are logged but the unsolicited verbs occur after the verb block
+	// this flag is used to flag such verb blocks and the list will store the
+	// responses
+	// we use a pre-allocated list - if we have more than 10 outstanding unsols
+	// we will drop
+	// not clear if mutexes would be the way to go
+	int block_unsol;
+	struct list_head unsol_list;
+	struct unsol_item unsol_items_prealloc[10];
+	int unsol_items_prealloc_used[10];
+
+	// add in specific nids for the intmike and linein as they seem to swap
+	// between macbook pros (14,3) and imacs (18,3)
+	int intmike_nid;
+	int linein_nid;
+	int intmike_adc_nid;
+	int linein_amp_nid;
+
+	// new item to deal with jack presence as Apple seems to have barfed
+	// the HDA spec by using a separate headphone chip
+	int jack_present;
+
+	// save the type of headphone connected
+	int headset_type;
+
+	// if headphone has mike or not
+	int have_mike;
+
+	// if headphone has buttons or not
+	int have_buttons;
+
+	// set when playing for plug/unplug events while playing
+	int playing;
+
+	// set when capturing for plug/unplug events while capturing
+	int capturing;
+
+	// changing coding - OSX sets up the format on plugin
+	// then does some minimal setup when start play
+	// initial coding delayed any format setup till actually play
+	// this works for no mike but not for mike - we need to initialize
+	// the mike on plugin
+	// this flag will be set when we have done the format setup
+	// so know if need to do it on play or not
+	// now need 2 flags - one for play and one for capture
+	int headset_play_format_setup_needed;
+	int headset_capture_format_setup_needed;
+
+	int headset_presetup_done;
+
+
+	int use_data;
+
+
+	// this is new item for dealing with headset plugins
+	// so can distinguish which phase we are in if have multiple interrupts
+	// not really used now have analyzed interrupts properly
+	int headset_phase;
+
+	// another dirty hack item to manage the different headset enable codes
+	int headset_enable;
+
+	int play_init;
+	int capture_init;
+
+	// new item to limit times we redo unmute/play
+	struct timespec64 last_play_time;
+	// record the first play time - we have a problem there
+	// some initial plays that I dont understand - so skip any setup
+	// till sometime after the first play
+	struct timespec64 first_play_time;
 };
 
 extern const struct snd_kcontrol_new cs42l42_dac_volume_mixer;
@@ -367,5 +498,6 @@ extern struct sub_codec dolphin_cs42l42_1;
 
 void cs8409_cs42l42_fixups(struct hda_codec *codec, const struct hda_fixup *fix, int action);
 void dolphin_fixups(struct hda_codec *codec, const struct hda_fixup *fix, int action);
-
+void cs_8409_fixup_gpio(struct hda_codec *codec,
+			const struct hda_fixup *fix, int action);
 #endif
