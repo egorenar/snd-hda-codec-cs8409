@@ -299,6 +299,23 @@ struct cs8409_cir_param {
 	unsigned int coeff;
 };
 
+
+#ifdef APPLE_CODECS
+struct unsol_item {
+	struct list_head list;
+	unsigned int idx;
+	unsigned int res;
+};
+struct hda_cvt_setup_apple {
+	hda_nid_t nid;
+	u8 stream_tag;
+	u8 channel_id;
+	u16 format_id;
+	unsigned char active;   /* cvt is currently used */
+	unsigned char dirty;    /* setups should be cleared */
+};
+#endif
+
 struct sub_codec {
 	struct hda_codec *codec;
 	unsigned int addr;
@@ -309,6 +326,9 @@ struct sub_codec {
 
 	unsigned int hp_jack_in:1;
 	unsigned int mic_jack_in:1;
+#ifdef APPLE_CODECS
+	unsigned int linein_jack_in:1;
+#endif
 	unsigned int suspended:1;
 	unsigned int paged:1;
 	unsigned int last_page;
@@ -341,6 +361,126 @@ struct cs8409_spec {
 	unsigned int capture_started:1;
 	unsigned int init_done:1;
 	unsigned int build_ctrl_done:1;
+
+#ifdef APPLE_CODECS
+
+	// additional data for Apple 8409 system
+
+	unsigned int spdif_detect:1;
+	unsigned int spdif_present:1;
+	unsigned int sense_b:1;
+	hda_nid_t vendor_nid;
+
+	/* digital beep */
+	hda_nid_t beep_nid;
+
+	/* for MBP SPDIF control */
+	int (*spdif_sw_put)(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol);
+
+	// so it appears we have "concurrency" in the linux HDA code
+	// in that if unsolicited responses occur which perform extensive verbs
+	// the hda verbs are intermixed with eg extensive start playback verbs
+	// on OSX we appear to have blocks of verbs during which unsolicited responses
+	// are logged but the unsolicited verbs occur after the verb block
+	// this flag is used to flag such verb blocks and the list will store the
+	// responses
+	// we use a pre-allocated list - if we have more than 10 outstanding unsols
+	// we will drop
+	// not clear if mutexes would be the way to go
+	int block_unsol;
+	struct list_head unsol_list;
+	struct unsol_item unsol_items_prealloc[10];
+	int unsol_items_prealloc_used[10];
+
+	// add in specific nids for the intmike and linein as they seem to swap
+	// between macbook pros (14,3) and imacs (18,3)
+	int intmike_nid;
+	int linein_nid;
+	int intmike_adc_nid;
+	int linein_amp_nid;
+
+	// the following flag bits also need swapping
+	int reg9_intmike_dmic_mo;
+	int reg9_linein_dmic_mo;
+	int reg82_intmike_dmic_scl;
+	int reg82_linein_dmic_scl;
+
+
+	// add explicit stream format store entries as per hda_codec using a local definition
+	// of hda_cvt_setup (which is local to hda_codec.c)
+	// also use explicit nid versions
+	// (except that means either need explicit functions for each nid or have to lookup
+	//  nid each time want to use in a generic function with nid argument)
+	struct hda_cvt_setup_apple nid_0x02;
+	struct hda_cvt_setup_apple nid_0x03;
+	struct hda_cvt_setup_apple nid_0x0a;
+	struct hda_cvt_setup_apple nid_0x22;
+	struct hda_cvt_setup_apple nid_0x23;
+	struct hda_cvt_setup_apple nid_0x1a;
+
+
+	// new item to deal with jack presence as Apple (and now Dell) seems to have barfed
+	// the HDA spec by using a separate headphone chip
+	int jack_present;
+
+	// save the type of headphone connected
+	int headset_type;
+
+	// if headphone has mike or not
+	int have_mike;
+
+	// if headphone has buttons or not
+	int have_buttons;
+
+        // current stream channel count
+        int stream_channels;
+
+	// set when playing for plug/unplug events while playing
+	int playing;
+
+	// set when capturing for plug/unplug events while capturing
+	int capturing;
+
+	// changing coding - OSX sets up the format on plugin
+	// then does some minimal setup when start play
+	// initial coding delayed any format setup till actually play
+	// this works for no mike but not for mike - we need to initialize
+	// the mike on plugin
+	// this flag will be set when we have done the format setup
+	// so know if need to do it on play or not
+	// now need 2 flags - one for play and one for capture
+	int headset_play_format_setup_needed;
+	int headset_capture_format_setup_needed;
+
+	int headset_presetup_done;
+
+
+	int use_data;
+
+
+	// this is new item for dealing with headset plugins
+	// so can distinguish which phase we are in if have multiple interrupts
+	// not really used now have analyzed interrupts properly
+	int headset_phase;
+
+	// another dirty hack item to manage the different headset enable codes
+	int headset_enable;
+
+	int play_init;
+	int capture_init;
+
+
+	// new item to limit times we redo unmute/play
+	struct timespec64 last_play_time;
+	// record the first play time - we have a problem there
+	// some initial plays that I dont understand - so skip any setup
+	// till sometime after the first play
+	struct timespec64 first_play_time;
+
+
+#endif
+
 
 	/* verb exec op override */
 	int (*exec_verb)(struct hdac_device *dev, unsigned int cmd, unsigned int flags,

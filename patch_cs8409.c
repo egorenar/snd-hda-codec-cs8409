@@ -1444,6 +1444,8 @@ void dolphin_fixups(struct hda_codec *codec, const struct hda_fixup *fix, int ac
 	}
 }
 
+static int patch_cs8409_apple(struct hda_codec *codec);
+
 static int patch_cs8409(struct hda_codec *codec)
 {
 	int err;
@@ -1451,7 +1453,18 @@ static int patch_cs8409(struct hda_codec *codec)
 	if (!cs8409_alloc_spec(codec))
 		return -ENOMEM;
 
+	printk("snd_hda_intel: Primary patch_cs8409\n");
+
 	snd_hda_pick_fixup(codec, cs8409_models, cs8409_fixup_tbl, cs8409_fixups);
+
+	// this seems the easiest way to separate and jump into the code for handling Apple machines using the 8409
+	// note now freeing the just allocated spec - this undos the delayed work as not using mutex yet
+	if (codec->fixup_id == HDA_FIXUP_ID_NOT_SET) {
+		printk("snd_hda_intel: Primary patch_cs8409 NOT FOUND trying APPLE\n");
+		cs8409_free(codec);
+		err = patch_cs8409_apple(codec);
+		return err;
+	}
 
 	codec_dbg(codec, "Picked ID=%d, VID=%08x, DEV=%08x\n", codec->fixup_id,
 			 codec->bus->pci->subsystem_vendor,
@@ -1468,6 +1481,12 @@ static int patch_cs8409(struct hda_codec *codec)
 	snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_PROBE);
 	return 0;
 }
+
+
+// for the moment split the new code into an include file
+
+#include "patch_cirrus_apple.h"
+
 
 static const struct hda_device_id snd_hda_id_cs8409[] = {
 	HDA_CODEC_ENTRY(0x10138409, "CS8409", patch_cs8409),
